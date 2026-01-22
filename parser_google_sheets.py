@@ -22,7 +22,6 @@ def find_posts_must_posted(content):
     В этот список попадают только те посты, в которых стоит галочка постинга
     и у которых пришло время постинга(настоящее время >= время постинга)
     '''
-    posted_post = []
     posted_posts = []
     now_datetime = datetime.now()
 
@@ -37,51 +36,72 @@ def find_posts_must_posted(content):
             ) and now_datetime >= want_posting_date
         )
 
+        if need_publish:
+            posted_posts.append((row_number, post))
+    return posted_posts
+
+
+def find_posts_must_delete(content):
+    '''Собирает список постов, которые нужно удалить(стоит флажок в таблице)'''
+    delete_posts = []
+
+    for row_number, post in enumerate(content['values'][1:], start=2):
         need_delete = (
             (post[6] == 'TRUE' and post[12] == 'TRUE' and post[9])
             or (post[7] == 'TRUE' and post[13] == 'TRUE' and post[10])
             or (post[8] == 'TRUE' and post[14] == 'TRUE' and post[11])
         )
 
-        if need_publish or need_delete:
-            posted_post.append((row_number, post))
-    return posted_post
+        if need_delete:
             posted_posts.append((row_number, post))
+    return delete_posts
 
 
 def posting_posts(must_posted_posts, post_text, image_path, service):
     for row_number, post in must_posted_posts:
+        # Постинг ВК
         if post[3] == 'TRUE' and post[6] == 'FALSE':
-            # Постинг ВК
             pass
-        if post[4] == 'TRUE' and post[7] == 'FALSE':
-            # Постинг ОК
-            ok_post_id = publish_post_to_ok(post_text, image_path)
-            if ok_post_id:
-                update_cell(row_number, 'H', True, service)  # Пост в OK
-                update_cell(row_number, 'K', ok_post_id, service)  # ID поста в OK
 
-        # Удаление поста
-        if post[7] == 'TRUE' and post[13] == 'TRUE' and post[10]:
-            ok_posted_id = post[10]
-            deleted = delete_post_from_ok(ok_posted_id)
-        
-            if deleted:
-                update_cell(row_number, 'H', False,service)   # Пост в OK
-                update_cell(row_number, 'K', 'Удалён', service)      # ID поста
+        # Постинг ОК
+        # if post[4] == 'TRUE' and post[7] == 'FALSE':
+        #     ok_post_id = publish_post_to_ok(post_text, image_path)
+        #     if ok_post_id:
+        #         update_cell(row_number, 'H', True, service)  # Пост в OK
+        #         update_cell(row_number, 'K', ok_post_id, service)  # ID поста в OK
 
+        # Постинг TG    
+        if post[5] == 'TRUE' and post[8] == 'FALSE':
             
-        # if post[5] == 'TRUE' and post[8] == 'FALSE':
-        #     #постинг TG
-        #         'Привет!',
-        #         'https://i.pinimg.com/originals/9b/26/fc/9b26fc49e07c6e4c21d00485c733ca8c.jpg',
-        #         chat_id,
-        #         bot
-        #     )
-        #     if tg_post_id:
-        #         update_cell(row_number, 'I', True, service)
-        #         update_cell(row_number, 'L', tg_post_id, service)
             tg_post_id = publish_post_to_tg(
+                post_text,
+                image_path,
+                chat_id,
+                bot
+            )
+            if tg_post_id:
+                update_cell(row_number, 'I', True, service)
+                update_cell(row_number, 'L', tg_post_id, service)
+
+def delete_posts(must_delete_posts, service):
+    '''Удаляет посты из соцсетей, которые помечены на удаление'''
+    for row_number, post in must_posted_posts:
+        # Удаление из ВК
+        if post[6] == 'TRUE' and post[12] == 'TRUE' and post[9]:
+            pass
+
+        # # Удаление из OK
+        # if post[7] == 'TRUE' and post[13] == 'TRUE' and post[10]:
+        #     ok_posted_id = post[10]
+        #     deleted = delete_post_from_ok(ok_posted_id)
+        
+        #     if deleted:
+        #         update_cell(row_number, 'H', False,service)   # Пост в OK
+        #         update_cell(row_number, 'K', 'Удалён', service)      # ID поста
+
+        # Удаление из TG
+        if post[8] == 'TRUE' and post[14] == 'TRUE' and post[11]:
+            pass
 
 
 def main():
@@ -92,6 +112,9 @@ def main():
     must_posted_posts = find_posts_must_posted(content)
     print(must_posted_posts)
     print()
+
+    must_delete_posts = find_posts_must_delete(content)
+
     text = '"Хаббл" - Космический телескоп '    # !!! Сюда нужно чтобы попадал текст с GOOGLE DOCKS
     post_text = normalize_text(text)
     image_path = 'images/Habble.jpeg'           # !!! Сюда нужно чтобы попадали изображения с GOOGLE DOCKS

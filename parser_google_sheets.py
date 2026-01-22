@@ -74,10 +74,10 @@ def posting_posts(must_posted_posts, post_text, image_path, service):
         if post[5] == 'TRUE' and post[8] == 'FALSE':
             
             tg_post_id = publish_post_to_tg(
-                post_text,
-                image_path,
                 chat_id,
-                tg_bot
+                tg_bot,
+                post_text,
+                image_path
             )
             if tg_post_id:
                 update_cell(row_number, 'I', True, service)

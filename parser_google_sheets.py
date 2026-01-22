@@ -119,18 +119,12 @@ def main():
     content = get_sheet_content(service)
     
     must_posted_posts = find_posts_must_posted(content)
-    print(must_posted_posts)
-    print()
-
     must_delete_posts = find_posts_must_delete(content)
-    print(must_delete_posts)
-    print()
 
     text = '"Хаббл" - Космический телескоп '    # !!! Сюда нужно чтобы попадал текст с GOOGLE DOCKS
     post_text = normalize_text(text)
     image_path = None        # !!! Сюда нужно чтобы попадали изображения с GOOGLE DOCKS
     posting_posts(must_posted_posts, post_text, image_path, service)
-
     delete_posts(must_delete_posts, service)
 
 

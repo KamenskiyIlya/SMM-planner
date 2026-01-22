@@ -23,6 +23,7 @@ def find_posts_must_posted(content):
     и у которых пришло время постинга(настоящее время >= время постинга)
     '''
     posted_post = []
+    posted_posts = []
     now_datetime = datetime.now()
 
     for row_number, post in enumerate(content['values'][1:], start=2):
@@ -45,6 +46,7 @@ def find_posts_must_posted(content):
         if need_publish or need_delete:
             posted_post.append((row_number, post))
     return posted_post
+            posted_posts.append((row_number, post))
 
 
 def posting_posts(must_posted_posts, post_text, image_path, service):

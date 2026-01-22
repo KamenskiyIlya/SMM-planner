@@ -3,17 +3,17 @@ from datetime import datetime
 from environs import Env
 
 from utils.google_api import auth_in_google, get_sheet_content, update_cell, normalize_text
-from tg_publisher import publish_post_to_tg
+from tg_publisher import publish_post_to_tg, delete_post_from_tg
 # from ok_publisher import publish_post_to_ok, delete_post_from_ok
 import telegram
 
 
 
 # позже вызов env. спрячем под main()
-# env = Env()
-# env.read_env()
-# chat_id = env.str('CHAT_ID')
-# bot = telegram.Bot(token=env.str('TG_BOT_TOKEN'))
+env = Env()
+env.read_env()
+chat_id = env.str('CHAT_ID')
+tg_bot = telegram.Bot(token=env.str('TG_BOT_TOKEN'))
 
 
 def find_posts_must_posted(content):
@@ -53,7 +53,7 @@ def find_posts_must_delete(content):
         )
 
         if need_delete:
-            posted_posts.append((row_number, post))
+            delete_posts.append((row_number, post))
     return delete_posts
 
 
@@ -77,7 +77,7 @@ def posting_posts(must_posted_posts, post_text, image_path, service):
                 post_text,
                 image_path,
                 chat_id,
-                bot
+                tg_bot
             )
             if tg_post_id:
                 update_cell(row_number, 'I', True, service)
@@ -85,23 +85,32 @@ def posting_posts(must_posted_posts, post_text, image_path, service):
 
 def delete_posts(must_delete_posts, service):
     '''Удаляет посты из соцсетей, которые помечены на удаление'''
-    for row_number, post in must_posted_posts:
+    for row_number, post in must_delete_posts:
         # Удаление из ВК
-        if post[6] == 'TRUE' and post[12] == 'TRUE' and post[9]:
+        if post[12] == 'TRUE' and post[9]:
             pass
 
         # # Удаление из OK
-        # if post[7] == 'TRUE' and post[13] == 'TRUE' and post[10]:
+        # if post[13] == 'TRUE' and post[10]:
         #     ok_posted_id = post[10]
         #     deleted = delete_post_from_ok(ok_posted_id)
         
         #     if deleted:
-        #         update_cell(row_number, 'H', False,service)   # Пост в OK
+        #         update_cell(row_number, 'H', False, service)   # Пост в OK
         #         update_cell(row_number, 'K', 'Удалён', service)      # ID поста
 
         # Удаление из TG
-        if post[8] == 'TRUE' and post[14] == 'TRUE' and post[11]:
-            pass
+        if post[8] == 'TRUE' and post[14] == 'TRUE':
+            tg_post_id = int(post[11])
+            deleted = delete_post_from_tg(tg_bot, chat_id, tg_post_id)
+
+            if deleted:
+                update_cell(row_number, 'F', False, service)    # флажок необходимости постинга
+                update_cell(row_number, 'I', False, service)    # флажок подтверждения постинга
+                update_cell(row_number, 'L', '', service)    # ID поста
+                update_cell(row_number, 'O', False, service)    # флажок удаления
+            else:
+                print('не удалось удалить пост')
 
 
 def main():
@@ -114,11 +123,16 @@ def main():
     print()
 
     must_delete_posts = find_posts_must_delete(content)
+    print(must_delete_posts)
+    print()
 
     text = '"Хаббл" - Космический телескоп '    # !!! Сюда нужно чтобы попадал текст с GOOGLE DOCKS
     post_text = normalize_text(text)
-    image_path = 'images/Habble.jpeg'           # !!! Сюда нужно чтобы попадали изображения с GOOGLE DOCKS
+    image_path = None        # !!! Сюда нужно чтобы попадали изображения с GOOGLE DOCKS
     posting_posts(must_posted_posts, post_text, image_path, service)
+
+    delete_posts(must_delete_posts, service)
+
 
 if __name__ == '__main__':
     main()

@@ -64,11 +64,11 @@ def posting_posts(must_posted_posts, post_text, image_path, service):
             pass
 
         # Постинг ОК
-        # if post[4] == 'TRUE' and post[7] == 'FALSE':
-        #     ok_post_id = publish_post_to_ok(post_text, image_path)
-        #     if ok_post_id:
-        #         update_cell(row_number, 'H', True, service)  # Пост в OK
-        #         update_cell(row_number, 'K', ok_post_id, service)  # ID поста в OK
+        if post[4] == 'TRUE' and post[7] == 'FALSE':
+            ok_post_id = publish_post_to_ok(post_text, image_path)
+            if ok_post_id:
+                update_cell(row_number, 'H', True, service)  # Пост в OK
+                update_cell(row_number, 'K', ok_post_id, service)  # ID поста в OK
 
         # Постинг TG    
         if post[5] == 'TRUE' and post[8] == 'FALSE':
@@ -85,19 +85,38 @@ def posting_posts(must_posted_posts, post_text, image_path, service):
 
 def delete_posts(must_delete_posts, service):
     '''Удаляет посты из соцсетей, которые помечены на удаление'''
-    for row_number, post in must_delete_posts:
-        # Удаление из ВК
-        if post[12] == 'TRUE' and post[9]:
-            pass
 
-        # # Удаление из OK
-        # if post[13] == 'TRUE' and post[10]:
-        #     ok_posted_id = post[10]
-        #     deleted = delete_post_from_ok(ok_posted_id)
+    for row_number, post in must_delete_posts:
+        result_message = ''
         
-        #     if deleted:
-        #         update_cell(row_number, 'H', False, service)   # Пост в OK
-        #         update_cell(row_number, 'K', 'Удалён', service)      # ID поста
+        # Удаление из ВК
+        if post[6] == 'TRUE' and post[12] == 'TRUE':
+            vk_post_id = post[9]
+            deleted = '' # метод удаления поста в ВК
+
+            if deleted:
+                update_cell(row_number, 'D', False, service)    # флажок необходимости постинга
+                update_cell(row_number, 'G', False, service)    # флажок подтверждения постинга
+                update_cell(row_number, 'J', '', service)    # ID поста
+                update_cell(row_number, 'M', False, service)    # флажок удаления
+                result_message += 'VK - удален '
+            else:
+                result_message += 'VK - не удален '
+
+
+        # Удаление из OK
+        if post[7] == 'TRUE' and post[13] == 'TRUE':
+            ok_post_id = post[10]
+            deleted = delete_post_from_ok(ok_post_id)
+        
+            if deleted:
+                update_cell(row_number, 'E', False, service)    # флажок необходимости постинга
+                update_cell(row_number, 'H', False, service)    # флажок подтверждения постинга
+                update_cell(row_number, 'K', '', service)    # ID поста
+                update_cell(row_number, 'N', False, service)    # флажок удаления
+                result_message += 'OK - удален '
+            else:
+                result_message += 'OK - не удален '
 
         # Удаление из TG
         if post[8] == 'TRUE' and post[14] == 'TRUE':
@@ -109,9 +128,11 @@ def delete_posts(must_delete_posts, service):
                 update_cell(row_number, 'I', False, service)    # флажок подтверждения постинга
                 update_cell(row_number, 'L', '', service)    # ID поста
                 update_cell(row_number, 'O', False, service)    # флажок удаления
+                result_message += 'TG - удален '
             else:
-                print('не удалось удалить пост')
+                result_message += 'TG - не удален '
 
+        update_cell(row_number, 'P', result_message, service)
 
 def main():
     # while:
@@ -120,6 +141,8 @@ def main():
     
     must_posted_posts = find_posts_must_posted(content)
     must_delete_posts = find_posts_must_delete(content)
+    text = ''   # !!! Сюда нужно чтобы попадал текст с GOOGLE DOCKS
+    image_path = 'https://i.pinimg.com/originals/64/0d/fd/640dfd0483f48fcfe6ee7ccff2e806fb.jpg?nii=t'   # !!! Сюда нужно чтобы попадали изображения с GOOGLE DOCKS
 
     if text:
         post_text = normalize_text(text)

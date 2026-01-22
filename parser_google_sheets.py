@@ -2,7 +2,7 @@ from pprint import pprint
 from datetime import datetime
 from environs import Env
 
-from utils.google_api import auth_in_google, get_sheet_content, update_cell
+from utils.google_api import auth_in_google, get_sheet_content, update_cell, normalize_text
 from tg_publisher import upload_post
 from ok_publisher import publish_post_to_ok, delete_post_from_ok
 import telegram
@@ -47,15 +47,13 @@ def find_posts_must_posted(content):
     return posted_post
 
 
-def posting_posts(must_posted_posts, service):
+def posting_posts(must_posted_posts, post_text, image_path, service):
     for row_number, post in must_posted_posts:
         if post[3] == 'TRUE' and post[6] == 'FALSE':
             # Постинг ВК
             pass
         if post[4] == 'TRUE' and post[7] == 'FALSE':
             # Постинг ОК
-            post_text = 'Космический телескоп «Хаббл»'
-            image_path = 'images/Habble.jpeg'
             ok_post_id = publish_post_to_ok(post_text, image_path)
             if ok_post_id:
                 update_cell(row_number, 'H', True, service)  # Пост в OK
@@ -88,11 +86,14 @@ def main():
     # while:
     service = auth_in_google()
     content = get_sheet_content(service)
+    
     must_posted_posts = find_posts_must_posted(content)
     print(must_posted_posts)
     print()
-
-    posting_posts(must_posted_posts, service)
+    text = '"Хаббл" - Космический телескоп '    # !!! Сюда нужно чтобы попадал текст с GOOGLE DOCKS
+    post_text = normalize_text(text)
+    image_path = 'images/Habble.jpeg'           # !!! Сюда нужно чтобы попадали изображения с GOOGLE DOCKS
+    posting_posts(must_posted_posts, post_text, image_path, service)
 
 if __name__ == '__main__':
     main()

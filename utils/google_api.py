@@ -38,4 +38,22 @@ def update_cell(row, column, value, service):
         range=f'{column}{row}',
         valueInputOption='RAW',
         body=body
-    ).execute() 
+    ).execute()
+
+
+def normalize_text(text):
+    result = []
+    open_quote = True
+    for char in text:
+        if char == '"':
+            if open_quote:
+                result.append('«')
+            else:
+                result.append('»')
+            open_quote = not open_quote
+        else:
+            result.append(char)
+    text = ''.join(result)
+    text = text.replace(' - ', ' — ')
+    text = re.sub(r'\s{2,}', ' ', text)
+    return text

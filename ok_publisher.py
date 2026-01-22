@@ -77,7 +77,7 @@ def publish_group_post(group_id, post_text, photo_token):
 def delete_post_from_ok(ok_posted_id):
     params = {
         'application_key': application_key,
-        'method': 'mediatopic.deleteByAuthor',
+        'method': 'mediatopic.deleteTopic',
         'gid': group_id,
         'topic_id': ok_posted_id,
         'format': 'json',
@@ -92,7 +92,7 @@ def delete_post_from_ok(ok_posted_id):
     result = response.json()
     print('OK DELETE RESPONSE:', result)
 
-    return result is True
+    return bool(result.get('success'))
 
 
 def publish_post_to_ok(post_text, image_path):

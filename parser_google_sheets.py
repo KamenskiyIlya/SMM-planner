@@ -9,14 +9,6 @@ from ok_publisher import publish_post_to_ok, delete_post_from_ok
 import telegram
 
 
-
-позже вызов env. спрячем под main()
-env = Env()
-env.read_env()
-chat_id = env.str('CHAT_ID')
-tg_bot = telegram.Bot(token=env.str('TG_BOT_TOKEN'))
-
-
 def find_posts_must_posted(content):
     '''Создает список постов, которые необходимо запостить(которые не постились)
 
@@ -72,13 +64,7 @@ def posting_posts(row_number, post, post_text, image_path, service):
 
         # Постинг TG    
         if post[5] == 'TRUE' and post[8] == 'FALSE':
-            
-            tg_post_id = publish_post_to_tg(
-                chat_id,
-                tg_bot,
-                post_text,
-                image_path
-            )
+            tg_post_id = publish_post_to_tg(post_text, image_path)
             if tg_post_id:
                 update_cell(row_number, 'I', True, service)
                 update_cell(row_number, 'L', tg_post_id, service)
@@ -120,7 +106,7 @@ def delete_posts(must_delete_posts, service):
         # Удаление из TG
         if post[8] == 'TRUE' and post[14] == 'TRUE':
             tg_post_id = int(post[11])
-            deleted = delete_post_from_tg(tg_bot, chat_id, tg_post_id)
+            deleted = delete_post_from_tg(tg_post_id)
 
             if deleted:
                 update_cell(row_number, 'F', False, service)    # флажок необходимости постинга

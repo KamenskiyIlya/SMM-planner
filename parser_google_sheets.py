@@ -132,14 +132,14 @@ def main():
         doc_url = post[1]
     
         post_text, image_path = get_post_content_from_gdoc(doc_url)
-    
-        posting_posts(
-            row_number,
-            post,
-            post_text,
-            image_path,
-            service
-        )
+        with open(image_path, 'rb') as image:
+            posting_posts(
+                row_number,
+                post,
+                post_text,
+                image,
+                service
+            )
 
     delete_posts(must_delete_posts, service)
 

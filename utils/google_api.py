@@ -7,13 +7,13 @@ from oauth2client.service_account import ServiceAccountCredentials
 SPREADSHEET_ID = '1esY5ipijX_tpqley5hz4_qAI7uQWtylWS9v52XMdht8'
 
 
-def auth_in_google():
+def auth_in_google_sheets():
     '''Экземпляр доступа api сервисов google'''
     token_file = 'token.json' #файл с ключами от сервисного акка
-    service_urls = ['https://www.googleapis.com/auth/spreadsheets']
+    sheets_service_urls = ['https://www.googleapis.com/auth/spreadsheets']
     credentials = ServiceAccountCredentials.from_json_keyfile_name(
         token_file,
-        service_urls
+        sheets_service_urls
     )
     http_auth = credentials.authorize(httplib2.Http())
     service = apiclient.discovery.build('sheets', 'v4', http=http_auth)
@@ -57,4 +57,6 @@ def normalize_text(text):
     text = ''.join(result)
     text = text.replace(' - ', ' — ')
     text = re.sub(r'\s{2,}', ' ', text)
+    text = re.sub(r'\s+([,.!?;:])', r'\1', text)
+    text = text.strip()
     return text

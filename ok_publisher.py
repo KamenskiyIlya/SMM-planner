@@ -38,29 +38,23 @@ def get_upload_url(group_id):
     )
 
 
-def upload_photo(upload_url, image_path):
-    with open(image_path, 'rb') as image_file:
-        response = requests.post(
-            upload_url,
-            files={'pic1': image_file}
-        )
+def upload_photo(upload_url, image_source):
+    if image_source.startswith('http'):
+        image_data = requests.get(image_source).content
+        files = {'pic1': image_data}
+        response = requests.post(upload_url, files=files)
+    else:
+        with open(image_source, 'rb') as image_file:
+            response = requests.post(
+                upload_url,
+                files={'pic1': image_file}
+            )
+
     response.raise_for_status()
     return response.json()
 
 
-def publish_group_post(group_id, post_text, photo_token):
-    media = [
-        {
-            'type': 'text',
-            'text': post_text,
-        },
-        {
-            'type': 'photo',
-            'list': [
-                {'id': photo_token}
-            ]
-        }
-    ]
+def publish_group_post(group_id, media):
     attachment = {
         'media': media
     }
@@ -74,12 +68,12 @@ def publish_group_post(group_id, post_text, photo_token):
     )
 
 
-def delete_post_from_ok(ok_posted_id):
+def delete_post_from_ok(ok_post_id):
     params = {
         'application_key': application_key,
         'method': 'mediatopic.deleteTopic',
         'gid': group_id,
-        'topic_id': ok_posted_id,
+        'topic_id': ok_post_id,
         'format': 'json',
     }
 
@@ -96,19 +90,37 @@ def delete_post_from_ok(ok_posted_id):
 
 
 def publish_post_to_ok(post_text, image_path):
-    # 1. Получаем upload URL для загрузки изображения:
-    upload_data = get_upload_url(group_id)
-    upload_url = upload_data['upload_url']
+    if not post_text and not image_path:
+        print('Нет контента для публикации')
+        return None
+    media = []
+    if post_text:
+        media.append({
+            'type': 'text',
+            'text': post_text,
+        })
 
- 	# 2. Загружаем фото и получаем обязательный Photo Token:
-    upload_result = upload_photo(upload_url, image_path)
-    photos_dict = upload_result['photos']
+    if image_path:
+        # 1. Получаем upload URL для загрузки изображения:
+        upload_data = get_upload_url(group_id)
+        upload_url = upload_data['upload_url']
 
-    for photo_info in photos_dict.values():
-        photo_token = photo_info['token']
-        break
+ 	    # 2. Загружаем фото и получаем обязательный Photo Token:
+        upload_result = upload_photo(upload_url, image_path)
+        photos_dict = upload_result['photos']
+        photo_token = None
+        for photo_info in photos_dict.values():
+            photo_token = photo_info['token']
+            break
+        if not photo_token:
+            print('Не удалось получить photo_token')
+            return None
+        media.append({
+            'type': 'photo',
+            'list': [{'id': photo_token}]
+        })
 
-    # 3. Публикуем пост:
-    published_post = publish_group_post(group_id, post_text, photo_token)
+        # 3. Публикуем пост:
+    published_post = publish_group_post(group_id, media)
     
     return published_post

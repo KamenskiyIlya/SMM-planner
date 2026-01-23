@@ -2,14 +2,15 @@ from pprint import pprint
 from datetime import datetime
 from environs import Env
 
-from utils.google_api import auth_in_google, get_sheet_content, update_cell, normalize_text
+from utils.google_api import auth_in_google_sheets, get_sheet_content, update_cell, normalize_text
+from utils.google_docs_api import get_post_content_from_gdoc
 from tg_publisher import publish_post_to_tg, delete_post_from_tg
-# from ok_publisher import publish_post_to_ok, delete_post_from_ok
+from ok_publisher import publish_post_to_ok, delete_post_from_ok
 import telegram
 
 
 
-# позже вызов env. спрячем под main()
+позже вызов env. спрячем под main()
 env = Env()
 env.read_env()
 chat_id = env.str('CHAT_ID')
@@ -57,8 +58,7 @@ def find_posts_must_delete(content):
     return delete_posts
 
 
-def posting_posts(must_posted_posts, post_text, image_path, service):
-    for row_number, post in must_posted_posts:
+def posting_posts(row_number, post, post_text, image_path, service):
         # Постинг ВК
         if post[3] == 'TRUE' and post[6] == 'FALSE':
             pass
@@ -135,20 +135,25 @@ def delete_posts(must_delete_posts, service):
 
 def main():
     # while:
-    service = auth_in_google()
+    service = auth_in_google_sheets()
     content = get_sheet_content(service)
     
     must_posted_posts = find_posts_must_posted(content)
     must_delete_posts = find_posts_must_delete(content)
-    text = ''   # !!! Сюда нужно чтобы попадал текст с GOOGLE DOCKS
-    image_path = 'https://i.pinimg.com/originals/64/0d/fd/640dfd0483f48fcfe6ee7ccff2e806fb.jpg?nii=t'   # !!! Сюда нужно чтобы попадали изображения с GOOGLE DOCKS
 
-    if text:
-        post_text = normalize_text(text)
-    else:
-        post_text = None       
+    for row_number, post in must_posted_posts:
+        doc_url = post[1]
     
-    posting_posts(must_posted_posts, post_text, image_path, service)
+        post_text, image_path = get_post_content_from_gdoc(doc_url)
+    
+        posting_posts(
+            row_number,
+            post,
+            post_text,
+            image_path,
+            service
+        )
+
     delete_posts(must_delete_posts, service)
 
 

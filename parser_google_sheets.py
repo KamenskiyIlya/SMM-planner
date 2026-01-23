@@ -51,6 +51,7 @@ def find_posts_must_delete(content):
 
 
 def posting_posts(row_number, post, post_text, image_path, service):
+    '''Постит все посты в указанные соцсети из списка постов на постинг'''
         # Постинг ВК
         if post[3] == 'TRUE' and post[6] == 'FALSE':
             pass

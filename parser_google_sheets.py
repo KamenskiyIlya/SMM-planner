@@ -9,7 +9,40 @@ from ok_publisher import publish_post_to_ok, delete_post_from_ok
 import telegram
 
 
-def find_posts_must_posted(content):
+def check_post_datetime(content, service):
+    now_datetime = datetime.now()
+
+    for row_number, post in enumerate(content['values'][1:], start=2):
+        try:
+            if post[2]:
+                want_posting_date = datetime.strptime(post[2], '%d.%m.%Y %H:%M:%S')
+                return want_posting_date
+            else:
+                want_posting_date = now_datetime
+                formatted_date = want_posting_date.strftime('%d.%m.%Y %H:%M:%S')
+                update_cell(row_number, 'C', formatted_date, service)
+                return want_posting_date
+        except ValueError:
+            try:
+                # Дописываем стандартное время для постинга, если пользователь не указал
+                sheet_date = datetime.strptime(post[2], '%d.%m.%Y')
+                base_publicate_hour = 13
+                want_posting_date = datetime(
+                    sheet_date.year,
+                    sheet_date.month,
+                    sheet_date.day,
+                    base_publicate_hour
+                )
+                formatted_date = want_posting_date.strftime('%d.%m.%Y %H:%M:%S')
+                
+                update_cell(row_number, 'C', formatted_date, service)
+                return want_posting_date
+            except ValueError:
+                # Информируем пользователя о не правильном формате даты и времени
+                update_cell(row_number, 'C', 'Указан не верный формат даты', service)
+                return
+
+def find_posts_must_posted(content, want_posting_date):
     '''Создает список постов, которые необходимо запостить(которые не постились)
 
     В этот список попадают только те посты, в которых стоит галочка постинга
@@ -19,18 +52,16 @@ def find_posts_must_posted(content):
     now_datetime = datetime.now()
 
     for row_number, post in enumerate(content['values'][1:], start=2):
-        want_posting_date = datetime.strptime(post[2], '%d.%m.%Y %H:%M:%S')
+            need_publish = (
+                (
+                    (post[3] == 'TRUE' and post[6] == 'FALSE')
+                    or (post[4] == 'TRUE' and post[7] == 'FALSE')
+                    or (post[5] == 'TRUE' and post[8] == 'FALSE')
+                ) and now_datetime >= want_posting_date
+            )
 
-        need_publish = (
-            (
-                (post[3] == 'TRUE' and post[6] == 'FALSE')
-                or (post[4] == 'TRUE' and post[7] == 'FALSE')
-                or (post[5] == 'TRUE' and post[8] == 'FALSE')
-            ) and now_datetime >= want_posting_date
-        )
-
-        if need_publish:
-            posted_posts.append((row_number, post))
+            if need_publish:
+                posted_posts.append((row_number, post))
     return posted_posts
 
 
@@ -112,24 +143,26 @@ def main():
     # while:
     service = auth_in_google_sheets()
     content = get_sheet_content(service)
-    
-    must_posted_posts = find_posts_must_posted(content)
-    must_delete_posts = find_posts_must_delete(content)
+    want_posting_date = check_post_datetime(content, service)
 
-    for row_number, post in must_posted_posts:
-        doc_url = post[1]
-    
-        post_text, image_path = get_post_content_from_gdoc(doc_url)
-        with open(image_path, 'rb') as image:
-            posting_posts(
-                row_number,
-                post,
-                post_text,
-                image,
-                service
-            )
+    if  want_posting_date:
+        must_posted_posts = find_posts_must_posted(content, want_posting_date)
+        must_delete_posts = find_posts_must_delete(content)
 
-    delete_posts(must_delete_posts, service)
+        for row_number, post in must_posted_posts:
+            doc_url = post[1]
+        
+            post_text, image_path = get_post_content_from_gdoc(doc_url)
+            with open(image_path, 'rb') as image:
+                posting_posts(
+                    row_number,
+                    post,
+                    post_text,
+                    image,
+                    service
+                )
+
+        delete_posts(must_delete_posts, service)
 
 
 if __name__ == '__main__':

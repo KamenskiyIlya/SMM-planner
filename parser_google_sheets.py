@@ -5,8 +5,8 @@ from environs import Env
 from utils.google_api import auth_in_google_sheets, get_sheet_content, update_cell, normalize_text
 from utils.google_docs_api import get_post_content_from_gdoc
 from tg_publisher import publish_post_to_tg, delete_post_from_tg
-# from ok_publisher import publish_post_to_ok, delete_post_from_ok
-# from vk_publisher import publish_post_to_vk, delete_post_from_vk
+from ok_publisher import publish_post_to_ok, delete_post_from_ok
+from vk_publisher import publish_post_to_vk, delete_post_from_vk
 import telegram
 
 
@@ -15,9 +15,7 @@ def check_post_datetime(post, row_number, service):
     try:
         if not post[2]:
             want_posting_date = now_datetime
-            print(want_posting_date)
             formatted_date = want_posting_date.strftime('%d.%m.%Y %H:%M:%S')
-            print(formatted_date)
             update_cell(row_number, 'C', formatted_date, service)
             return want_posting_date
         if post[2]:
@@ -53,18 +51,31 @@ def find_posts_must_posted(content, service):
     now_datetime = datetime.now()
 
     for row_number, post in enumerate(content['values'][1:], start=2):
-        if post[1]:
-            want_posting_date = check_post_datetime(post, row_number, service)
-            need_publish = (
-                (
-                    (post[3] == 'TRUE' and post[6] == 'FALSE')
-                    or (post[4] == 'TRUE' and post[7] == 'FALSE')
-                    or (post[5] == 'TRUE' and post[8] == 'FALSE')
-                ) and now_datetime >= want_posting_date
-            )
+            if post[1]:
+                try:
+                    want_posting_date = check_post_datetime(post, row_number, service)
+                    need_publish = (
+                        (
+                            (post[3] == 'TRUE' and post[6] == 'FALSE' and not post[9])
+                            or (post[4] == 'TRUE' and post[7] == 'FALSE' and not post[10])
+                            or (post[5] == 'TRUE' and post[8] == 'FALSE' and not post[11])
+                        ) and now_datetime >= want_posting_date
+                    )
 
-            if need_publish:
-                posted_posts.append((row_number, post))
+                    if want_posting_date and need_publish:
+                        posted_posts.append((row_number, post))
+                except Exception as er:
+                    print(f'Ошибка: {er}')
+
+            # проставляю галочки постинга обратно(на случай если пользователь снял)
+            # если пост уже есть
+            if post[9]:
+                update_cell(row_number, 'G', True, service)
+            if post[10]:
+                update_cell(row_number, 'H', True, service)
+            if post[11]:
+                update_cell(row_number, 'I', True, service)
+
     return posted_posts
 
 

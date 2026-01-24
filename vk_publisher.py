@@ -34,7 +34,7 @@ def upload_photo_for_wall(image_path):
         else:
             files = {'photo': open(image_path, 'rb')}
     else:
-        raise TypeError('Unsupported image_path type')
+        raise TypeError('Неподдерживаемый тип image_path')
 
     response = requests.post(upload_url, files=files)
     response.raise_for_status()

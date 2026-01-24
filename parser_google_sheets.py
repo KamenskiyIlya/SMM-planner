@@ -1,12 +1,12 @@
-from pprint import pprint
 from datetime import datetime, timedelta
 from environs import Env
+import os
 
 from utils.google_api import auth_in_google_sheets, get_sheet_content, update_cell, normalize_text
 from utils.google_docs_api import get_post_content_from_gdoc
 from tg_publisher import publish_post_to_tg, delete_post_from_tg
-from ok_publisher import publish_post_to_ok, delete_post_from_ok
-from vk_publisher import publish_post_to_vk, delete_post_from_vk
+# from ok_publisher import publish_post_to_ok, delete_post_from_ok
+# from vk_publisher import publish_post_to_vk, delete_post_from_vk
 import telegram
 
 
@@ -117,11 +117,11 @@ def find_posts_must_delete(content):
     return delete_posts
 
 
-def posting_posts(row_number, post, post_text, image_path, service):
+def posting_posts(row_number, post, post_text, image, service, image_ext):
     '''Постит все посты в указанные соцсети из списка постов на постинг'''
     # Постинг ВК
     if post[3] == 'TRUE' and post[6] == 'FALSE':
-        vk_post_id = publish_post_to_vk(post_text, image_path)
+        vk_post_id = publish_post_to_vk(post_text, image)
         if vk_post_id:
             update_cell(row_number, 'G', True, service)      # Пост в VK
             update_cell(row_number, 'J', vk_post_id, service)  # ID поста VK
@@ -130,7 +130,7 @@ def posting_posts(row_number, post, post_text, image_path, service):
 
     # Постинг ОК
     if post[4] == 'TRUE' and post[7] == 'FALSE':
-        ok_post_id = publish_post_to_ok(post_text, image_path)
+        ok_post_id = publish_post_to_ok(post_text, image)
         if ok_post_id:
             update_cell(row_number, 'H', True, service)  # Пост в OK
             update_cell(row_number, 'K', ok_post_id, service)  # ID поста в OK
@@ -140,7 +140,7 @@ def posting_posts(row_number, post, post_text, image_path, service):
 
     # Постинг TG    
     if post[5] == 'TRUE' and post[8] == 'FALSE':
-        tg_post_id = publish_post_to_tg(post_text, image_path)
+        tg_post_id = publish_post_to_tg(post_text, image_ext, image)
         if tg_post_id:
             update_cell(row_number, 'I', True, service)
             update_cell(row_number, 'L', tg_post_id, service)
@@ -224,6 +224,7 @@ def main():
     for row_number, post in must_posted_posts:
         doc_url = post[1]
         post_text, image_path = get_post_content_from_gdoc(doc_url)
+        image_ext = os.path.splitext(image_path)[1]
 
         with open(image_path, 'rb') as image:
             posting_posts(
@@ -231,7 +232,8 @@ def main():
                 post,
                 post_text,
                 image,
-                service
+                service,
+                image_ext
             )
 
     delete_posts(must_delete_posts, service)

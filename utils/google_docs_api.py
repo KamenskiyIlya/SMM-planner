@@ -48,7 +48,11 @@ def extract_first_image(document):
     response = requests.get(image_url)
     response.raise_for_status()
 
-    image_path = 'images/from_gdoc.jpg'
+    content_discription = response.headers['Content-Disposition']
+    content_discription = content_discription.split('.')
+    file_ext = content_discription[1].strip('"')
+
+    image_path = f'images/from_gdoc.{file_ext}'
     with open(image_path, 'wb') as f:
         f.write(response.content)
 

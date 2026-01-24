@@ -1,5 +1,5 @@
 from pprint import pprint
-from datetime import datetime
+from datetime import datetime, timedelta
 from environs import Env
 
 from utils.google_api import auth_in_google_sheets, get_sheet_content, update_cell, normalize_text
@@ -11,6 +11,13 @@ import telegram
 
 
 def check_post_datetime(post, row_number, service):
+    '''Проверяет правильно формата времени и возвращает datetime.
+
+    Проверяет правильность формата времени в таблице, добавляет
+    стандартное время, если оно не было указано. Если дата и время не были указано
+    выставляет в таблице нынешние дату и время. Если пользователь ввел дату
+    в не правильном формате указывает об ошибке в таблице
+    '''
     now_datetime = datetime.now()
     try:
         if not post[2]:
@@ -163,11 +170,39 @@ def delete_posts(must_delete_posts, service):
                 update_cell(row_number, 'O', False, service)    # флажок удаления
 
 
+def check_temporary_posts(content, service):
+    '''Проверяет временный ли пост, и помечает в таблице когда его удалить.
+
+    Проверяет отметил ли пользователь пост как временный, выставляет в
+    таблице время его удаления. Если пришло время удаления поста, тогда
+    ставит галочки на удаление из всех соцсетей.
+    '''
+    now_datetime = datetime.now()
+    datetime_delta = timedelta(seconds=20)
+
+    try:
+        for row_number, post in enumerate(content['values'][1:], start=2):
+            if post[15] == 'TRUE' and len(post) < 17:
+                delete_date = now_datetime + datetime_delta
+                formatted_date = delete_date.strftime('%d.%m.%Y %H:%M:%S')
+                update_cell(row_number, 'Q', formatted_date, service)
+            if post[15] == 'TRUE' and len(post) == 17:
+                delete_date = datetime.strptime(post[16], '%d.%m.%Y %H:%M:%S')
+                if now_datetime >= delete_date:
+                    update_cell(row_number, 'M', True, service)
+                    update_cell(row_number, 'N', True, service)
+                    update_cell(row_number, 'O', True, service)
+    except Exception as er:
+        print(f'ошибка: {er}')
+
+
+
 def main():
     # while:
     service = auth_in_google_sheets()
     content = get_sheet_content(service)
 
+    check_temporary_posts(content, service)
     must_posted_posts = find_posts_must_posted(content, service)
     must_delete_posts = find_posts_must_delete(content)
 

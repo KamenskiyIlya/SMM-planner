@@ -16,6 +16,7 @@ def publish_post_to_tg(text: str, photo = None):
 			result = bot.send_message(chat_id=chat_id, text=text)
 			return result['message_id']
 	except Exception as er:
+		print(f'Ошибка TG: {er}')
 		return
 
 
@@ -29,4 +30,4 @@ def delete_post_from_tg(post_id):
 		result = bot.delete_message(chat_id=chat_id, message_id=post_id)
 		return result
 	except Exception as er:
-		pass
+		print(f"Ошибка при удалении TG: {er}")

@@ -16,7 +16,7 @@ def publish_post_to_tg(text: str, photo = None):
 			result = bot.send_message(chat_id=chat_id, text=text)
 			return result['message_id']
 	except Exception as er:
-		pass
+		return
 
 
 def delete_post_from_tg(post_id):
@@ -30,6 +30,3 @@ def delete_post_from_tg(post_id):
 		return result
 	except Exception as er:
 		pass
-		
-
-	# доделать отработку, если пользователь передает только текст или только фото

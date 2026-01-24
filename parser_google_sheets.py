@@ -5,45 +5,45 @@ from environs import Env
 from utils.google_api import auth_in_google_sheets, get_sheet_content, update_cell, normalize_text
 from utils.google_docs_api import get_post_content_from_gdoc
 from tg_publisher import publish_post_to_tg, delete_post_from_tg
-from ok_publisher import publish_post_to_ok, delete_post_from_ok
-from vk_publisher import publish_post_to_vk, delete_post_from_vk
+# from ok_publisher import publish_post_to_ok, delete_post_from_ok
+# from vk_publisher import publish_post_to_vk, delete_post_from_vk
 import telegram
 
 
-def check_post_datetime(content, service):
+def check_post_datetime(post, row_number, service):
     now_datetime = datetime.now()
-
-    for row_number, post in enumerate(content['values'][1:], start=2):
+    try:
+        if not post[2]:
+            want_posting_date = now_datetime
+            print(want_posting_date)
+            formatted_date = want_posting_date.strftime('%d.%m.%Y %H:%M:%S')
+            print(formatted_date)
+            update_cell(row_number, 'C', formatted_date, service)
+            return want_posting_date
+        if post[2]:
+            want_posting_date = datetime.strptime(post[2], '%d.%m.%Y %H:%M:%S')
+            return want_posting_date
+    except ValueError:
         try:
-            if post[2]:
-                want_posting_date = datetime.strptime(post[2], '%d.%m.%Y %H:%M:%S')
-                return want_posting_date
-            else:
-                want_posting_date = now_datetime
-                formatted_date = want_posting_date.strftime('%d.%m.%Y %H:%M:%S')
-                update_cell(row_number, 'C', formatted_date, service)
-                return want_posting_date
+            # Дописываем стандартное время для постинга, если пользователь не указал
+            sheet_date = datetime.strptime(post[2], '%d.%m.%Y')
+            base_publicate_hour = 13
+            want_posting_date = datetime(
+                sheet_date.year,
+                sheet_date.month,
+                sheet_date.day,
+                base_publicate_hour
+            )
+            formatted_date = want_posting_date.strftime('%d.%m.%Y %H:%M:%S')
+            
+            update_cell(row_number, 'C', formatted_date, service)
+            return want_posting_date
         except ValueError:
-            try:
-                # Дописываем стандартное время для постинга, если пользователь не указал
-                sheet_date = datetime.strptime(post[2], '%d.%m.%Y')
-                base_publicate_hour = 13
-                want_posting_date = datetime(
-                    sheet_date.year,
-                    sheet_date.month,
-                    sheet_date.day,
-                    base_publicate_hour
-                )
-                formatted_date = want_posting_date.strftime('%d.%m.%Y %H:%M:%S')
-                
-                update_cell(row_number, 'C', formatted_date, service)
-                return want_posting_date
-            except ValueError:
-                # Информируем пользователя о не правильном формате даты и времени
-                update_cell(row_number, 'C', 'Указан не верный формат даты', service)
-                return
+            # Информируем пользователя о не правильном формате даты и времени
+            update_cell(row_number, 'C', 'Указан не верный формат даты', service)
+            return
 
-def find_posts_must_posted(content, want_posting_date):
+def find_posts_must_posted(content, service):
     '''Создает список постов, которые необходимо запостить(которые не постились)
 
     В этот список попадают только те посты, в которых стоит галочка постинга
@@ -53,6 +53,8 @@ def find_posts_must_posted(content, want_posting_date):
     now_datetime = datetime.now()
 
     for row_number, post in enumerate(content['values'][1:], start=2):
+        if post[1]:
+            want_posting_date = check_post_datetime(post, row_number, service)
             need_publish = (
                 (
                     (post[3] == 'TRUE' and post[6] == 'FALSE')
@@ -90,6 +92,8 @@ def posting_posts(row_number, post, post_text, image_path, service):
         if vk_post_id:
             update_cell(row_number, 'G', True, service)      # Пост в VK
             update_cell(row_number, 'J', vk_post_id, service)  # ID поста VK
+        else:
+            update_cell(row_number, 'J', 'Возникла ошибка', service)
 
     # Постинг ОК
     if post[4] == 'TRUE' and post[7] == 'FALSE':
@@ -97,6 +101,9 @@ def posting_posts(row_number, post, post_text, image_path, service):
         if ok_post_id:
             update_cell(row_number, 'H', True, service)  # Пост в OK
             update_cell(row_number, 'K', ok_post_id, service)  # ID поста в OK
+        else:
+            update_cell(row_number, 'K', 'Возникла ошибка', service)
+
 
     # Постинг TG    
     if post[5] == 'TRUE' and post[8] == 'FALSE':
@@ -104,6 +111,8 @@ def posting_posts(row_number, post, post_text, image_path, service):
         if tg_post_id:
             update_cell(row_number, 'I', True, service)
             update_cell(row_number, 'L', tg_post_id, service)
+        else:
+            update_cell(row_number, 'L', 'Возникла ошибка', service)
 
 def delete_posts(must_delete_posts, service):
     '''Удаляет посты из соцсетей, которые помечены на удаление'''
@@ -147,26 +156,24 @@ def main():
     # while:
     service = auth_in_google_sheets()
     content = get_sheet_content(service)
-    want_posting_date = check_post_datetime(content, service)
 
-    if  want_posting_date:
-        must_posted_posts = find_posts_must_posted(content, want_posting_date)
-        must_delete_posts = find_posts_must_delete(content)
+    must_posted_posts = find_posts_must_posted(content, service)
+    must_delete_posts = find_posts_must_delete(content)
 
-        for row_number, post in must_posted_posts:
-            doc_url = post[1]
-        
-            post_text, image_path = get_post_content_from_gdoc(doc_url)
-            with open(image_path, 'rb') as image:
-                posting_posts(
-                    row_number,
-                    post,
-                    post_text,
-                    image,
-                    service
-                )
+    for row_number, post in must_posted_posts:
+        doc_url = post[1]
+        post_text, image_path = get_post_content_from_gdoc(doc_url)
 
-        delete_posts(must_delete_posts, service)
+        with open(image_path, 'rb') as image:
+            posting_posts(
+                row_number,
+                post,
+                post_text,
+                image,
+                service
+            )
+
+    delete_posts(must_delete_posts, service)
 
 
 if __name__ == '__main__':

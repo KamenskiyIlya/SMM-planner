@@ -140,7 +140,7 @@ def posting_posts(row_number, post, post_text, image, service, image_ext):
 
     # Постинг TG    
     if post[5] == 'TRUE' and post[8] == 'FALSE':
-        tg_post_id = publish_post_to_tg(post_text, image_ext, image)
+        tg_post_id = publish_post_to_tg(image_ext, image, post_text)
         if tg_post_id:
             update_cell(row_number, 'I', True, service)
             update_cell(row_number, 'L', tg_post_id, service)
@@ -224,16 +224,26 @@ def main():
     for row_number, post in must_posted_posts:
         doc_url = post[1]
         post_text, image_path = get_post_content_from_gdoc(doc_url)
-        image_ext = os.path.splitext(image_path)[1]
+        if image_path:
+            image_ext = os.path.splitext(image_path)[1]
 
-        with open(image_path, 'rb') as image:
+            with open(image_path, 'rb') as image:
+                posting_posts(
+                    row_number,
+                    post,
+                    post_text,
+                    image,
+                    service,
+                    image_ext
+                )
+        else:
             posting_posts(
                 row_number,
                 post,
                 post_text,
-                image,
+                None,
                 service,
-                image_ext
+                None
             )
 
     delete_posts(must_delete_posts, service)

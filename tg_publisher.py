@@ -3,13 +3,13 @@ from environs import Env
 
 
 
-def publish_post_to_tg(text: str, photo_ext, photo = None):
+def publish_post_to_tg(photo_ext, photo, text: str=''):
 	try:
 		env = Env()
 		env.read_env()
 		chat_id = env.str('CHAT_ID')
 		bot = telegram.Bot(token=env.str('TG_BOT_TOKEN'))
-		if photo and photo_ext in ['.jpeg', 'jpg', 'png']:
+		if photo and photo_ext in ['.jpeg', '.jpg', '.png']:
 			result = bot.send_photo(chat_id=chat_id, photo=photo, caption=text)
 			return result['message_id']
 		if photo and photo_ext == '.gif':

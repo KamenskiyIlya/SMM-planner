@@ -41,10 +41,10 @@ def publish_post_to_tg(post_text, image_source, image_ext=None):
                     caption=post_text
                 )
             else:
-                with open(image_source, 'rb') as f:
+                with open(image_source, 'rb') as file:
                     msg = bot.send_document(
                         chat_id=chat_id,
-                        document=f,
+                        document=file,
                         caption=post_text
                     )
             return msg.message_id
@@ -57,10 +57,10 @@ def publish_post_to_tg(post_text, image_source, image_ext=None):
                 caption=post_text
             )
         else:
-            with open(image_source, 'rb') as f:
+            with open(image_source, 'rb') as file:
                 msg = bot.send_photo(
                     chat_id=chat_id,
-                    photo=f,
+                    photo=file,
                     caption=post_text
                 )
 

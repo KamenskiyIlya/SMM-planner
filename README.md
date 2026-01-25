@@ -84,7 +84,8 @@ pip install -r requirements.txt
 ```
 python general_smm_publisher.py
 ```
-После запуска скрипта сервис постинга будет работать до тех пор, пока включен этот скрипт.
+После запуска скрипта сервис постинга будет работать до тех пор, пока включен этот скрипт, вы должны увидеть следующее сообщение в консолиЖ
+<img width="1088" height="142" alt="image" src="https://github.com/user-attachments/assets/9c2504e5-bb5f-41fd-972e-0638536ec212" />
 
 ## Настройка Google Docs
 

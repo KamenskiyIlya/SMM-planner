@@ -114,7 +114,7 @@ def upload_gif_for_wall(image_source):
     return f"doc{doc['owner_id']}_{doc['id']}"
 
 
-def publish_post_to_vk(post_text, image_source=None, image_ext):
+def publish_post_to_vk(post_text, image_source=None, image_ext=None):
     if not post_text and not image_source:
         raise ApiError('VK', 'Нет контента для публикации')
 

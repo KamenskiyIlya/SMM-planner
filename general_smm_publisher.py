@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from utils.google_api import auth_in_google_sheets, get_sheet_content, update_cell, normalize_text
 from utils.google_docs_api import get_post_content_from_gdoc
@@ -10,6 +10,45 @@ from tg_publisher import publish_post_to_tg, delete_post_from_tg
 
 from utils.logger import get_logger
 from utils.safe_publish import safe_call
+
+
+def check_post_datetime(post, row_number, service):
+    '''Проверяет правильно формата времени и возвращает datetime.
+
+    Проверяет правильность формата времени в таблице, добавляет
+    стандартное время, если оно не было указано. Если дата и время не были указано
+    выставляет в таблице нынешние дату и время. Если пользователь ввел дату
+    в не правильном формате указывает об ошибке в таблице
+    '''
+    now_datetime = datetime.now()
+    try:
+        if not post[2]:
+            want_posting_date = now_datetime
+            formatted_date = want_posting_date.strftime('%d.%m.%Y %H:%M:%S')
+            update_cell(row_number, 'C', formatted_date, service)
+            return want_posting_date
+        if post[2]:
+            want_posting_date = datetime.strptime(post[2], '%d.%m.%Y %H:%M:%S')
+            return want_posting_date
+    except ValueError:
+        try:
+            # Дописываем стандартное время для постинга, если пользователь не указал
+            sheet_date = datetime.strptime(post[2], '%d.%m.%Y')
+            base_publicate_hour = 13
+            want_posting_date = datetime(
+                sheet_date.year,
+                sheet_date.month,
+                sheet_date.day,
+                base_publicate_hour
+            )
+            formatted_date = want_posting_date.strftime('%d.%m.%Y %H:%M:%S')
+            
+            update_cell(row_number, 'C', formatted_date, service)
+            return want_posting_date
+        except ValueError:
+            # Информируем пользователя о не правильном формате даты и времени
+            update_cell(row_number, 'C', 'Указан не верный формат даты', service)
+            return
 
 
 def _cell(post, idx, default = ''):
@@ -38,32 +77,59 @@ def _guess_ext(image_source, fallback=None):
     return None
 
 
-def find_posts_must_posted(content):
-    """Собирает строки, которые нужно запостить (флажок соцсети TRUE, а 'Пост в ...' FALSE)."""
+def find_posts_must_posted(content, service):
+    """Собирает строки, которые нужно запостить (флажок соцсети TRUE, а 'Пост в ...' FALSE).
+
+    В этот список попадают только те посты, в которых стоит галочка постинга
+    и у которых пришло время постинга(настоящее время >= время постинга)
+    """
     posted_posts = []
     now_datetime = datetime.now()
 
     for row_number, post in enumerate(content.get('values', [])[1:], start=2):
         datetime_raw = _cell(post, 2)
-        try:
-            want_posting_date = datetime.strptime(datetime_raw, '%d.%m.%Y %H:%M:%S')
-        except Exception:
-            # если формат даты сломан — пропускаем (или можно писать ошибку в таблицу)
-            continue
+        if post[1]:
+            # проставляю галочки постинга обратно(на случай если пользователь снял)
+            # если пост уже есть
+            if post[9] and post[9] != 'Удален' and post[9] != 'Возникла ошибка':
+                update_cell(row_number, 'G', True, service)
+            if post[10] and post[10] != 'Удален' and post[10] != 'Возникла ошибка':
+                update_cell(row_number, 'H', True, service)
+            if post[11] and post[11] != 'Удален' and post[11] != 'Возникла ошибка':
+                update_cell(row_number, 'I', True, service)
 
-        need_publish = (
-            (
-                (_cell(post, 3) == 'TRUE' and _cell(post, 6) == 'FALSE')     # VK
-                or (_cell(post, 4) == 'TRUE' and _cell(post, 7) == 'FALSE')  # OK
-                or (_cell(post, 5) == 'TRUE' and _cell(post, 8) == 'FALSE')  # TG
-            )
-            and now_datetime >= want_posting_date
-        )
+            try:
+                want_posting_date = check_post_datetime(post, row_number, service)
+                need_publish = (
+                    (
+                        (post[3] == 'TRUE' and post[6] == 'FALSE' and (
+                                post[9] == 'Удален'
+                                or post[9] == 'Возникла ошибка'
+                                or not post[9]
+                            )
+                        )
+                        or (post[4] == 'TRUE' and post[7] == 'FALSE' and (
+                                post[10] == 'Удален'
+                                or post[10] == 'Возникла ошибка'
+                                or not post[10]
+                            )
+                        )
+                        or (post[5] == 'TRUE' and post[8] == 'FALSE' and (
+                                post[11] == 'Удален' 
+                                or post[11] == 'Возникла ошибка'
+                                or not post[11]
+                            )
+                        )
+                    ) and now_datetime >= want_posting_date
+                )
 
-        if need_publish:
-            posted_posts.append((row_number, post))
+                if want_posting_date and need_publish:
+                    posted_posts.append((row_number, post))
+            except Exception as er:
+                print(f'Ошибка: {er}')
 
     return posted_posts
+
 
 
 def find_posts_must_delete(content):
@@ -81,6 +147,37 @@ def find_posts_must_delete(content):
             delete_posts.append((row_number, post))
 
     return delete_posts
+
+
+def check_temporary_posts(content, service):
+    '''Проверяет временный ли пост, и помечает в таблице когда его удалить.
+
+    Проверяет отметил ли пользователь пост как временный, выставляет в
+    таблице время его удаления. Если пришло время удаления поста, тогда
+    ставит галочки на удаление из всех соцсетей.
+    '''
+    now_datetime = datetime.now()
+    datetime_delta = timedelta(seconds=20)
+
+    try:
+        for row_number, post in enumerate(content['values'][1:], start=2):
+            if post[15] == 'TRUE' and len(post) < 17:
+                delete_date = now_datetime + datetime_delta
+                formatted_date = delete_date.strftime('%d.%m.%Y %H:%M:%S')
+                update_cell(row_number, 'Q', formatted_date, service)
+            if post[15] == 'TRUE' and len(post) > 16:
+                delete_date = datetime.strptime(post[16], '%d.%m.%Y %H:%M:%S')
+                if now_datetime >= delete_date:
+                    if _cell(post, 6) == 'TRUE':
+                        update_cell(row_number, 'M', True, service)
+                    if _cell(post, 7) == 'TRUE':
+                        update_cell(row_number, 'N', True, service)
+                    if _cell(post, 8) == 'TRUE':
+                        update_cell(row_number, 'O', True, service)
+                    update_cell(row_number, 'P', False, service)
+                    update_cell(row_number, 'Q', '', service)
+    except Exception as er:
+        print(f'ошибка: {er}')
 
 
 def _load_post_content(doc_url):
@@ -136,6 +233,8 @@ def posting_posts(must_posted_posts, service):
                 lambda: publish_post_to_vk(post_text, image_source, image_ext),
                 context=context,
             )
+            #Убирает флажок удалить если такой стоял
+            update_cell(row_number, 'M', False, service)
 
             if vk_post_id:
                 update_cell(row_number, 'G', True, service)
@@ -154,6 +253,9 @@ def posting_posts(must_posted_posts, service):
                 context=context,
             )
 
+            #Убирает флажок удалить если такой стоял
+            update_cell(row_number, 'N', False, service)
+
             if ok_post_id:
                 update_cell(row_number, 'H', True, service)
                 update_cell(row_number, 'K', ok_post_id, service)
@@ -170,6 +272,10 @@ def posting_posts(must_posted_posts, service):
                 lambda: publish_post_to_tg(post_text, image_source, image_ext),
                 context=context
             )
+
+            #Убирает флажок удалить если такой стоял
+            update_cell(row_number, 'O', False, service)
+
             if tg_post_id:
                 update_cell(row_number, 'I', True, service)
                 update_cell(row_number, 'L', tg_post_id, service)
@@ -243,7 +349,8 @@ def main():
     service = auth_in_google_sheets()
     content = get_sheet_content(service)
 
-    must_posted_posts = find_posts_must_posted(content)
+    check_temporary_posts(content, service)
+    must_posted_posts = find_posts_must_posted(content, service)
     must_delete_posts = find_posts_must_delete(content)
 
     posting_posts(must_posted_posts, service)
@@ -251,5 +358,5 @@ def main():
 
 
 if __name__ == '__main__':
-    while:
+    while True:
         main()

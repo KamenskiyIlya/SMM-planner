@@ -13,9 +13,13 @@ VK_GROUP_ID = int(env.str('VK_GROUP_ID'))  # без минуса
 VK_API_VERSION = '5.199'
 
 
-def _vk_call(method, params):
+def vk_call(method, params):
     url = f'https://api.vk.com/method/{method}'
-    params = {**params, 'access_token': VK_API_TOKEN, 'v': VK_API_VERSION}
+    params = {
+        **params,
+        'access_token': VK_API_TOKEN,
+        'v': VK_API_VERSION
+    }
 
     try:
         response = requests.post(url, params=params, timeout=30)
@@ -39,7 +43,7 @@ def _vk_call(method, params):
 
 def upload_photo_for_wall(image_source):
     # 1) Получаем upload_url
-    response = _vk_call('photos.getWallUploadServer', {'group_id': VK_GROUP_ID})
+    response = vk_call('photos.getWallUploadServer', {'group_id': VK_GROUP_ID})
     upload_url = response['upload_url']
 
     # 2) Загружаем файл
@@ -65,7 +69,7 @@ def upload_photo_for_wall(image_source):
         raise ApiError('VK', f'Получен некорректный JSON: {e}')
 
     # 3) Сохраняем фото
-    saved = _vk_call(
+    saved = vk_call(
         'photos.saveWallPhoto',
         {
             'group_id': VK_GROUP_ID,
@@ -81,7 +85,7 @@ def upload_photo_for_wall(image_source):
 
 # gif грузим как документ для стены
 def upload_gif_for_wall(image_source):
-    response = _vk_call('docs.getWallUploadServer', {'group_id': VK_GROUP_ID})
+    response = vk_call('docs.getWallUploadServer', {'group_id': VK_GROUP_ID})
     upload_url = response['upload_url']
 
     try:
@@ -105,7 +109,7 @@ def upload_gif_for_wall(image_source):
     except ValueError as e:
         raise ApiError('VK', f'Bad JSON from upload: {e}')
 
-    saved = _vk_call('docs.save', {'file': upload_response['file']})
+    saved = vk_call('docs.save', {'file': upload_response['file']})
     doc = saved['doc']
 
     access_key = doc.get('access_key')
@@ -129,7 +133,7 @@ def publish_post_to_vk(post_text, image_source=None, image_ext=None):
         else:
             attachments.append(upload_photo_for_wall(image_source))
 
-    response = _vk_call(
+    response = vk_call(
         'wall.post',
         {
             'owner_id': -VK_GROUP_ID,
@@ -146,5 +150,5 @@ def publish_post_to_vk(post_text, image_source=None, image_ext=None):
 
 
 def delete_post_from_vk(post_id):
-    response = _vk_call('wall.delete', {'owner_id': -VK_GROUP_ID, 'post_id': post_id})
+    response = vk_call('wall.delete', {'owner_id': -VK_GROUP_ID, 'post_id': post_id})
     return response == 1

@@ -5,7 +5,7 @@ from environs import Env
 from utils.exceptions import ApiError
 
 
-def _get_bot():
+def get_bot():
     env = Env()
     env.read_env()
     chat_id = env.str('CHAT_ID')
@@ -13,13 +13,13 @@ def _get_bot():
     return bot, chat_id
 
 
-def _is_url(value):
+def is_url(value):
     return isinstance(value, str) and value.startswith(('http://', 'https://'))
 
 
 def publish_post_to_tg(post_text, image_source, image_ext=None):
     try:
-        bot, chat_id = _get_bot()
+        bot, chat_id = get_bot()
         # --- если нет картинки ---
         if not image_source:
             msg = bot.send_message(chat_id=chat_id, text=post_text)
@@ -34,7 +34,7 @@ def publish_post_to_tg(post_text, image_source, image_ext=None):
 
         # --- GIF ---
         if image_ext == '.gif':
-            if _is_url(image_source):
+            if is_url(image_source):
                 msg = bot.send_document(
                     chat_id=chat_id,
                     document=image_source,
@@ -50,7 +50,7 @@ def publish_post_to_tg(post_text, image_source, image_ext=None):
             return msg.message_id
 
         # --- обычное фото ---
-        if _is_url(image_source):
+        if is_url(image_source):
             msg = bot.send_photo(
                 chat_id=chat_id,
                 photo=image_source,
@@ -74,7 +74,7 @@ def publish_post_to_tg(post_text, image_source, image_ext=None):
 
 
 def delete_post_from_tg(post_id) -> bool:
-    bot, chat_id = _get_bot()
+    bot, chat_id = get_bot()
     try:
         return bool(bot.delete_message(chat_id=chat_id, message_id=post_id))
     except telegram.error.TelegramError as e:

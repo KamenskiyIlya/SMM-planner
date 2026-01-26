@@ -13,13 +13,14 @@ from utils.safe_publish import safe_call
 
 
 def check_post_datetime(post, row_number, service):
-    '''Проверяет правильно формата времени и возвращает datetime.
+    """Проверяет правильно формата времени и возвращает datetime.
 
     Проверяет правильность формата времени в таблице, добавляет
-    стандартное время, если оно не было указано. Если дата и время не были указано
-    выставляет в таблице нынешние дату и время. Если пользователь ввел дату
-    в не правильном формате указывает об ошибке в таблице
-    '''
+    стандартное время, если оно не было указано. Если дата и время
+    не были указано выставляет в таблице нынешние дату и время.
+    Если пользователь ввел дату в не правильном формате указывает
+    об ошибке в таблице.
+    """
     now_datetime = datetime.now()
     try:
         if not post[2]:
@@ -32,7 +33,7 @@ def check_post_datetime(post, row_number, service):
             return want_posting_date
     except ValueError:
         try:
-            # Дописываем стандартное время для постинга, если пользователь не указал
+            # Дописываем стандартное время для постинга, если не указали
             sheet_date = datetime.strptime(post[2], '%d.%m.%Y')
             base_publicate_hour = 13
             want_posting_date = datetime(
@@ -42,16 +43,20 @@ def check_post_datetime(post, row_number, service):
                 base_publicate_hour
             )
             formatted_date = want_posting_date.strftime('%d.%m.%Y %H:%M:%S')
-            
             update_cell(row_number, 'C', formatted_date, service)
             return want_posting_date
         except ValueError:
             # Информируем пользователя о не правильном формате даты и времени
-            update_cell(row_number, 'C', 'Указан не верный формат даты', service)
+            update_cell(
+                row_number,
+                'C',
+                'Указан не верный формат даты',
+                service
+            )
             return
 
 
-def _cell(post, idx, default = ''):
+def read_cell(post, idx, default=''):
     """Безопасное чтение ячейки по индексу."""
     try:
         return post[idx]
@@ -59,7 +64,7 @@ def _cell(post, idx, default = ''):
         return default
 
 
-def _guess_ext(image_source, fallback=None):
+def guess_extstension(image_source, fallback=None):
     """Пытается определить расширение файла по пути/URL/файлу."""
     if fallback:
         return fallback
@@ -78,19 +83,18 @@ def _guess_ext(image_source, fallback=None):
 
 
 def find_posts_must_posted(content, service):
-    """Собирает строки, которые нужно запостить (флажок соцсети TRUE, а 'Пост в ...' FALSE).
-
-    В этот список попадают только те посты, в которых стоит галочка постинга
-    и у которых пришло время постинга(настоящее время >= время постинга)
+    """Собирает строки, которые нужно запостить (флажок соцсети TRUE,
+    а 'Пост в ...' FALSE). В этот список попадают только те посты,
+    в которых стоит галочка постинга и у которых пришло время постинга
+    (настоящее время >= время постинга).
     """
     posted_posts = []
     now_datetime = datetime.now()
 
     for row_number, post in enumerate(content.get('values', [])[1:], start=2):
-        datetime_raw = _cell(post, 2)
         if post[1]:
-            # проставляю галочки постинга обратно(на случай если пользователь снял)
-            # если пост уже есть
+        # проставляю галочки постинга обратно(на случай если пользователь снял)
+        # если пост уже есть
             if post[9] and post[9] != 'Удален' and post[9] != 'Возникла ошибка':
                 update_cell(row_number, 'G', True, service)
             if post[10] and post[10] != 'Удален' and post[10] != 'Возникла ошибка':
@@ -115,7 +119,7 @@ def find_posts_must_posted(content, service):
                             )
                         )
                         or (post[5] == 'TRUE' and post[8] == 'FALSE' and (
-                                post[11] == 'Удален' 
+                                post[11] == 'Удален'
                                 or post[11] == 'Возникла ошибка'
                                 or not post[11]
                             )
@@ -131,34 +135,32 @@ def find_posts_must_posted(content, service):
     return posted_posts
 
 
-
 def find_posts_must_delete(content):
-    """Собирает строки, которые нужно удалить (стоит флажок удаления + есть ID поста)."""
+    """
+    Собирает строки, которые нужно удалить
+    (стоит флажок удаления + есть ID поста).
+    """
     delete_posts = []
-
     for row_number, post in enumerate(content.get('values', [])[1:], start=2):
         need_delete = (
-            (_cell(post, 6) == 'TRUE' and _cell(post, 12) == 'TRUE' and _cell(post, 9))         # VK
-            or (_cell(post, 7) == 'TRUE' and _cell(post, 13) == 'TRUE' and _cell(post, 10))     # OK
-            or (_cell(post, 8) == 'TRUE' and _cell(post, 14) == 'TRUE' and _cell(post, 11))     # TG
+            (read_cell(post, 6) == 'TRUE' and read_cell(post, 12) == 'TRUE' and read_cell(post, 9))         # VK
+            or (read_cell(post, 7) == 'TRUE' and read_cell(post, 13) == 'TRUE' and read_cell(post, 10))     # OK
+            or (read_cell(post, 8) == 'TRUE' and read_cell(post, 14) == 'TRUE' and read_cell(post, 11))     # TG
         )
-
         if need_delete:
             delete_posts.append((row_number, post))
-
     return delete_posts
 
 
 def check_temporary_posts(content, service):
-    '''Проверяет временный ли пост, и помечает в таблице когда его удалить.
+    """Проверяет временный ли пост, и помечает в таблице когда его удалить.
 
     Проверяет отметил ли пользователь пост как временный, выставляет в
     таблице время его удаления. Если пришло время удаления поста, тогда
     ставит галочки на удаление из всех соцсетей.
-    '''
+    """
     now_datetime = datetime.now()
     datetime_delta = timedelta(seconds=20)
-
     try:
         for row_number, post in enumerate(content['values'][1:], start=2):
             if post[15] == 'TRUE' and len(post) < 17:
@@ -168,11 +170,11 @@ def check_temporary_posts(content, service):
             if post[15] == 'TRUE' and len(post) > 16:
                 delete_date = datetime.strptime(post[16], '%d.%m.%Y %H:%M:%S')
                 if now_datetime >= delete_date:
-                    if _cell(post, 6) == 'TRUE':
+                    if read_cell(post, 6) == 'TRUE':
                         update_cell(row_number, 'M', True, service)
-                    if _cell(post, 7) == 'TRUE':
+                    if read_cell(post, 7) == 'TRUE':
                         update_cell(row_number, 'N', True, service)
-                    if _cell(post, 8) == 'TRUE':
+                    if read_cell(post, 8) == 'TRUE':
                         update_cell(row_number, 'O', True, service)
                     update_cell(row_number, 'P', False, service)
                     update_cell(row_number, 'Q', '', service)
@@ -180,7 +182,7 @@ def check_temporary_posts(content, service):
         print(f'ошибка: {er}')
 
 
-def _load_post_content(doc_url):
+def load_post_content(doc_url):
     """Достаёт текст+картинку из Google Docs.
 
     Ожидаемые варианты возврата get_post_content_from_gdoc:
@@ -204,7 +206,7 @@ def _load_post_content(doc_url):
     if post_text:
         post_text = normalize_text(post_text)
 
-    image_ext = _guess_ext(image_source, image_ext)
+    image_ext = guess_extstension(image_source, image_ext)
     return post_text, image_source, image_ext
 
 
@@ -213,11 +215,11 @@ def posting_posts(must_posted_posts, service):
     logger = get_logger()
 
     for row_number, post in must_posted_posts:
-        doc_url = _cell(post, 1)
+        doc_url = read_cell(post, 1)
         context = {'row': row_number, 'doc': doc_url}
 
         try:
-            post_text, image_source, image_ext = _load_post_content(doc_url)
+            post_text, image_source, image_ext = load_post_content(doc_url)
         except Exception as e:
             logger.exception(f"GDOCS CRASH | {context} | {type(e).__name__}: {e}")
             update_cell(row_number, 'P', f"GDOCS: {type(e).__name__}", service)
@@ -226,14 +228,14 @@ def posting_posts(must_posted_posts, service):
         result_message = []
 
         # -------- VK --------
-        if _cell(post, 3) == 'TRUE' and _cell(post, 6) == 'FALSE':
+        if read_cell(post, 3) == 'TRUE' and read_cell(post, 6) == 'FALSE':
             vk_post_id, vk_err = safe_call(
                 logger,
                 'VK',
                 lambda: publish_post_to_vk(post_text, image_source, image_ext),
                 context=context,
             )
-            #Убирает флажок удалить если такой стоял
+            # Убирает флажок удалить если такой стоял
             update_cell(row_number, 'M', False, service)
 
             if vk_post_id:
@@ -245,7 +247,7 @@ def posting_posts(must_posted_posts, service):
                 result_message.append(f"VK: {vk_err}")
 
         # -------- OK --------
-        if _cell(post, 4) == 'TRUE' and _cell(post, 7) == 'FALSE':
+        if read_cell(post, 4) == 'TRUE' and read_cell(post, 7) == 'FALSE':
             ok_post_id, ok_err = safe_call(
                 logger,
                 'OK',
@@ -253,7 +255,7 @@ def posting_posts(must_posted_posts, service):
                 context=context,
             )
 
-            #Убирает флажок удалить если такой стоял
+            # Убирает флажок удалить если такой стоял
             update_cell(row_number, 'N', False, service)
 
             if ok_post_id:
@@ -265,7 +267,7 @@ def posting_posts(must_posted_posts, service):
                 result_message.append(f"OK: {ok_err}")
 
         # -------- TG --------
-        if _cell(post, 5) == 'TRUE' and _cell(post, 8) == 'FALSE':
+        if read_cell(post, 5) == 'TRUE' and read_cell(post, 8) == 'FALSE':
             tg_post_id, tg_err = safe_call(
                 logger,
                 'TG',
@@ -273,7 +275,7 @@ def posting_posts(must_posted_posts, service):
                 context=context
             )
 
-            #Убирает флажок удалить если такой стоял
+            # Убирает флажок удалить если такой стоял
             update_cell(row_number, 'O', False, service)
 
             if tg_post_id:
@@ -294,9 +296,9 @@ def delete_posts(must_delete_posts, service):
         result_message = []
 
         # -------- VK --------
-        if _cell(post, 6) == 'TRUE' and _cell(post, 12) == 'TRUE' and _cell(post, 9):
+        if read_cell(post, 6) == 'TRUE' and read_cell(post, 12) == 'TRUE' and read_cell(post, 9):
             try:
-                vk_post_id = int(_cell(post, 9))
+                vk_post_id = int(read_cell(post, 9))
             except ValueError:
                 vk_post_id = None
 
@@ -312,8 +314,8 @@ def delete_posts(must_delete_posts, service):
                     result_message.append(f"VK: {err or 'не удален'}")
 
         # -------- OK --------
-        if _cell(post, 7) == 'TRUE' and _cell(post, 13) == 'TRUE' and _cell(post, 10):
-            ok_post_id = _cell(post, 10)
+        if read_cell(post, 7) == 'TRUE' and read_cell(post, 13) == 'TRUE' and read_cell(post, 10):
+            ok_post_id = read_cell(post, 10)
             deleted, err = safe_call(logger, 'OK', lambda: delete_post_from_ok(ok_post_id), context=context)
 
             if deleted:
@@ -326,9 +328,9 @@ def delete_posts(must_delete_posts, service):
                 result_message.append(f"OK: {err or 'не удален'}")
 
         # -------- TG --------
-        if _cell(post, 8) == 'TRUE' and _cell(post, 14) == 'TRUE' and _cell(post, 11):
+        if read_cell(post, 8) == 'TRUE' and read_cell(post, 14) == 'TRUE' and read_cell(post, 11):
             try:
-                tg_post_id = int(_cell(post, 11))
+                tg_post_id = int(read_cell(post, 11))
             except ValueError:
                 tg_post_id = None
 

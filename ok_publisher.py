@@ -61,7 +61,7 @@ def upload_photo(upload_url, image_source):
             else:
                 files = {'pic1': open(image_source, 'rb')}
         else:
-            raise TypeError('Unsupported image_source type')
+            raise TypeError('Неподдерживаемый тип image_source')
 
         response = requests.post(upload_url, files=files, timeout=60)
         response.raise_for_status()
@@ -69,7 +69,7 @@ def upload_photo(upload_url, image_source):
     except requests.exceptions.RequestException as e:
         raise NetworkError('OK', str(e))
     except ValueError as e:
-        raise ApiError('OK', f'Bad JSON from upload: {e}')
+        raise ApiError('OK', f'Получен некорректный JSON: {e}')
 
 
 def publish_group_post(group_id, media):

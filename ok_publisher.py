@@ -37,7 +37,7 @@ def ok_api_response(method, extra_params):
     except requests.exceptions.RequestException as e:
         raise NetworkError('OK', str(e))
     except ValueError as e:
-        raise ApiError('OK', f'Bad JSON from OK: {e}')
+        raise ApiError('OK', f'Получен некорректный JSON от ОК: {e}')
 
     if isinstance(data, dict) and data.get('error_code'):
         raise ApiError('OK', f"{data.get('error_code')}: {data.get('error_msg')}")
